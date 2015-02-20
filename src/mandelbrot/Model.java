@@ -1,6 +1,8 @@
 package mandelbrot;
 
 import java.awt.Dimension;
+import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
@@ -32,6 +34,10 @@ public class Model extends Observable implements ActionListener {
 	
 	// ==== Properties ====
 	
+	private final GraphicsConfiguration config = GraphicsEnvironment
+			.getLocalGraphicsEnvironment().getDefaultScreenDevice()
+			.getDefaultConfiguration();
+    
 	private int threadCount = Runtime.getRuntime().availableProcessors();
 	
     private int maxIter = 1000;
@@ -83,10 +89,9 @@ public class Model extends Observable implements ActionListener {
     	}
     	
     	if (this.threadCount != threadCount) {
-//    		// TODO: Implement startDrawing(); and stopDrawing();
-//    		stopDrawing();
-//    		this.threadCount = threadCount;
-//    		startDrawing();
+    		stopDrawing();
+    		this.threadCount = threadCount;
+    		startDrawing();
     	}
     }
     
@@ -97,6 +102,37 @@ public class Model extends Observable implements ActionListener {
     public synchronized final Dimension getSize() {
     	return new Dimension(this.image.getWidth(), this.image.getHeight());
     }
+    
+	public synchronized void setSize(Dimension size) {
+		// trigger if the image has been altered
+		if (image == null || size.width != image.getWidth()
+				|| size.height != image.getHeight()) {
+			stopDrawing();
+
+			BufferedImage newImage;
+
+			if (image != null) {
+				newImage.getGraphics().drawImage(image, 0, 0, image.getWidth(),
+						image.getHeight(), null);
+			}
+			
+			image = newImage;
+			
+			//TODO: updateIndexes();
+			
+			startDrawing();
+		}
+	}
+	
+	// ==== Private Helper Methods ====
+	
+	private void stopDrawing() {
+		
+	}
+	
+	private void startDrawing() {
+		
+	}
     
 
 	@Override
