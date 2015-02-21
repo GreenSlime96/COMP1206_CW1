@@ -1,6 +1,8 @@
 package mandelbrot;
 
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
@@ -10,6 +12,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.Observable;
 import java.util.Observer;
@@ -29,6 +32,8 @@ public class View extends JComponent implements Observer, ActionListener {
 	private final Model model;
 
 	private final Timer timer = new Timer(250, this);
+	
+	private String complex = "";
 
 	// ==== Constructor ====
 
@@ -83,7 +88,17 @@ public class View extends JComponent implements Observer, ActionListener {
 			@Override
 			public void mouseReleased(MouseEvent e) {
 				if (panning) {
+					panning = false;
 					model.setActive(true);
+				}
+			}
+			
+			// labeling
+			public void mouseMoved(MouseEvent e){
+				if (!panning) {
+					Point2D p = model.getPoint(e.getX(), e.getY());	
+					complex = p.getX() + " + " + p.getY() + "i";
+					repaint();
 				}
 			}
 
@@ -137,10 +152,15 @@ public class View extends JComponent implements Observer, ActionListener {
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		
+		g.setColor(Color.white);
+		
+		FontMetrics f = g.getFontMetrics();
 		BufferedImage image = model.getImage();
 		int w = Math.min(image.getWidth(), getWidth()),
 				h = Math.min(image.getHeight(), getHeight());
 		g.drawImage(image, 0, 0, w, h, 0, 0, w, h, null);
+		g.drawString(complex, (w - f.stringWidth(complex)) / 2,
+				h - f.getHeight());
 	}
 
 	// ==== Observer Implementation ====

@@ -3,6 +3,8 @@ package mandelbrot;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
@@ -18,6 +20,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
@@ -79,28 +82,134 @@ public class Controls extends Box implements Observer, ActionListener,
 
 		model = aModel;
 		model.addObserver(this);
-	}
+		
+        // add listeners
+        threadsSpinner.addChangeListener(this);
+        fpsSpinner.addChangeListener(this);
+        algorithmComboBox.addActionListener(this);
+        maxIterSpinner.addChangeListener(this);
+        maxRadiusSpinner.addChangeListener(this);
+        histogramCheckBox.addItemListener(this);
+        leftButton.addActionListener(this);
+        rightButton.addActionListener(this);
+        upButton.addActionListener(this);
+        downButton.addActionListener(this);
+        inButton.addActionListener(this);
+        outButton.addActionListener(this);
+        fitButton.addActionListener(this);
+        
+        // settings
+        addSetting("main.threads", threadsSpinner);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        addSetting("main.fps", fpsSpinner);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        addSetting("main.algorithm", algorithmComboBox);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        addSetting("main.iter", maxIterSpinner);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        addSetting("main.radius", maxRadiusSpinner);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        addSetting("main.histogram", histogramCheckBox);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        
+        // controls
+        JPanel moving = new JPanel(new GridLayout(3, 3, 2, 2));
+        moving.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        moving.add(outButton);
+        moving.add(upButton);
+        moving.add(inButton);
+        moving.add(leftButton);
+        moving.add(fitButton);
+        moving.add(rightButton);
+        moving.add(createGlue());
+        moving.add(downButton);
+        moving.add(createGlue());
+        addSetting("main.viewport", moving);
+        
+        // vertical spacing in a really weird way ..
+        add(new JPanel(new GridBagLayout()));
 
-	@Override
-	public void stateChanged(ChangeEvent e) {
-		// TODO Auto-generated method stub
+        // rendering time
+        renderingLabel.setToolTipText(Localization.get("main.rendering.help"));
+        add(renderingLabel);
+        add(Box.createRigidArea(new Dimension(0, 8)));
 
+        // progress bar
+        progressBar.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        progressBar.setMinimum(0);
+        progressBar.setMaximum(100);
+        add(progressBar);
 	}
 
 	// ==== ActionListener Implementation ====
 
-	@Override
-	public void actionPerformed(ActionEvent e) {
-		final Object source = e.getSource();
-		final Dimension size = model.getSize();
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        final Object source = e.getSource();
+        final Dimension size = model.getSize();
 
+        // fit best
+        if (source == fitButton) {
+            model.fit();
 
-	}
+        // zooming and moving
+        } else if (source == inButton || source == outButton) {
+            model.scale(size.width / 2, size.height / 2, source == inButton ?
+                ZOOM_FACTOR : 1/ZOOM_FACTOR);
+
+        // moving
+        } else if (source == leftButton) {
+            model.translate((int)Math.round(-size.width * MOVE_FACTOR), 0);
+        } else if (source == rightButton) {
+            model.translate((int)Math.round(size.width * MOVE_FACTOR), 0);
+        } else if (source == upButton) {
+            model.translate(0, (int)Math.round(-size.height * MOVE_FACTOR));
+        } else if (source == downButton) {
+            model.translate(0, (int)Math.round(size.height * MOVE_FACTOR));
+
+        // algorithm
+        } else if (source == algorithmComboBox) {
+//            model.setAlgorithm(algorithmComboBox.getSelectedIndex() == 0 ?
+//                Model.ALGORITHM_ESCAPE_TIME :
+//                Model.ALGORITHM_NORMALIZED_ITERATION_COUNT);
+        }
+    }
+    
+	// ==== ChangeListener Implementation ====
+	
+    @Override
+    public void stateChanged(ChangeEvent e) {
+        if (e.getSource() == threadsSpinner) {
+            model.setThreadCount((Integer)threadsSpinner.getModel().getValue());
+        } else if (e.getSource() == fpsSpinner) {
+            model.setFps((Integer)fpsSpinner.getModel().getValue());
+        } else if (e.getSource() == maxIterSpinner) {
+            model.setMaxIterations(
+                (Integer)maxIterSpinner.getModel().getValue());
+        } else if (e.getSource() == maxRadiusSpinner) {
+            model.setMaxRadius(
+                (Double)maxRadiusSpinner.getModel().getValue());
+        }
+    }
+    
+    // ==== Observer Implementation ====
 
 	@Override
 	public void update(Observable o, Object arg) {
-		// TODO Auto-generated method stub
-
+        if (o == model) {
+            threadsSpinner.getModel().setValue(model.getThreadCount());
+            fpsSpinner.getModel().setValue(model.getFps());
+//            algorithmComboBox.setSelectedIndex(
+//                model.getAlgorithm() == Model.ALGORITHM_ESCAPE_TIME ? 0 : 1);
+            maxIterSpinner.getModel().setValue(model.getMaxIterations());
+            maxRadiusSpinner.getModel().setValue(model.getMaxRadius());
+//            histogramCheckBox.setSelected(model.getHistEqualization());
+            renderingLabel.setText(model.getProgress() < 1.f ?
+                Localization.get("main.rendering.title") :
+                String.format(Localization.get("main.rendered.title"),
+                    model.getRenderingTime() / 1000.f));
+            progressBar.setValue((int)(model.getProgress() * 100));
+        }
 	}
 
 	@Override

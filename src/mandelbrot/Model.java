@@ -12,6 +12,8 @@ import java.awt.image.BufferedImage;
 import java.util.Observable;
 import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.Timer;
 
@@ -51,13 +53,21 @@ public class Model extends Observable implements ActionListener {
 	private int threadCount = Runtime.getRuntime().availableProcessors();
 	private final Vector<Thread> threads = new Vector<Thread>(threadCount);
 	private CountDownLatch firstRun;
+	
+    private int[] indexes;
+    private double[] iterations;
+    private AtomicInteger[] histogram;
+    private final AtomicInteger firstIndex = new AtomicInteger();
+    private final AtomicInteger secondIndex = new AtomicInteger();
+    private final AtomicInteger processed = new AtomicInteger();
 
 	private boolean active = true;
-	private Point2D location = new Point2D.Double(-2.5, -1);
+	private Point2D location = new Point2D.Double(-2.5, 1);
 	private double scale = 1 / 200.;
 	private int fps = 25;
 	private int maxIter = 1000;
 	private double maxRadius = 2;
+    private boolean histEqualization = true;
 	private volatile long renderingTime = 0;
 	private long renderingStart = 0;
 
@@ -174,7 +184,7 @@ public class Model extends Observable implements ActionListener {
 
 			image = newImage;
 
-			// TODO: updateIndexes();
+			updateIndexes();
 
 			startDrawing();
 		}
@@ -253,8 +263,7 @@ public class Model extends Observable implements ActionListener {
 	 * @return
 	 */
 	public synchronized final float getProgress() {
-		// TODO: implement progress checking
-		return Math.min(1.f, 1.f);
+		return Math.min(1.f, (float) processed.get() / indexes.length);
 	}
 
 	/**
@@ -263,7 +272,7 @@ public class Model extends Observable implements ActionListener {
 	 */
 	public synchronized final long getRenderingTime() {
 		// TODO: implement rendering time
-		return 1;
+		return renderingTime;
 	}
 
 	// ==== Public Methods ====
@@ -289,8 +298,9 @@ public class Model extends Observable implements ActionListener {
 		}
 
 		// update Mandelbrot coordinates
+		System.out.println(location.getX() + "\t" + location.getY());
 		location.setLocation(location.getX() + rectangle.x * scale,
-				location.getY() + rectangle.y * scale);
+				location.getY() - rectangle.y * scale);
 		scale = rectangle.width * scale / image.getWidth();
 
 		// scale image region to provide a fast yet not sharp preview
@@ -308,6 +318,14 @@ public class Model extends Observable implements ActionListener {
 
 		startDrawing();
 	}
+	
+	public synchronized Point2D getPoint(int x, int y) {
+		Point2D point = new Point2D.Double();
+		System.out.println(location.getX() + "\t" + location.getY());
+		point.setLocation(location.getX() + x * scale, location.getY() - y * scale);
+		
+		return point;
+	}
 
 	/**
 	 * 
@@ -315,7 +333,7 @@ public class Model extends Observable implements ActionListener {
 	public synchronized void fit() {
 		stopDrawing();
 
-		location = new Point2D.Double(-2.5, -1);
+		location = new Point2D.Double(-2.5, 1);
 		scale = 1 / 200.;
 
 		show(new Rectangle(0, 0, (int) (3.5 / scale), (int) (2. / scale)));
@@ -347,8 +365,6 @@ public class Model extends Observable implements ActionListener {
 		show(new Rectangle(dx, dy, image.getWidth(), image.getHeight()));
 	}
 
-	// TODO: write Public Methods
-
 	// ==== ActionListener Implementation ====
 
 	public void actionPerformed(ActionEvent e) {
@@ -371,6 +387,28 @@ public class Model extends Observable implements ActionListener {
 	}
 
 	// ==== Private Helper Methods ====
+	
+	private void updateIndexes() {
+		final int total = image.getWidth() * image.getHeight();
+		
+		// create increasing pixel indexes
+		indexes = new int[total]; 
+		for (int i = 0; i < total; i++)
+			indexes[i] = i;
+		
+        // apply Knuth shuffle for random permutation
+        for (int i = 0; i < total; ++i) {
+            int j = (int)(Math.random() * total);
+
+            int t = indexes[i];
+            indexes[i] = indexes[j];
+            indexes[j] = t;
+        }
+		
+		iterations = new double[total];
+		
+		firstIndex.set(0);		
+	}
 
 	private void stopDrawing() {
 		// interrupts all threads
@@ -397,6 +435,18 @@ public class Model extends Observable implements ActionListener {
 
 	private void startDrawing() {
 		if (active) {
+            firstRun = new CountDownLatch(threadCount);
+            firstIndex.set(0);
+            secondIndex.set(0);
+            processed.set(0);
+
+//            // set histogram bins to zero
+//            if (histEqualization) {
+//                for (int i = 0; i <= maxIter; ++i) {
+//                    histogram[i].set(0);
+//                }
+//            }
+            
 			timer.start();
 			renderingStart = System.currentTimeMillis();
 			
@@ -413,13 +463,59 @@ public class Model extends Observable implements ActionListener {
 	
 	private class Calculation extends Thread {
 		final int width = image.getWidth();
-//		final int total = indexes.length;
+		final int total = indexes.length;
 
 		@Override
 		public void run() {
-			// TODO Auto-generated method stub
+			// compute iterations and eventually store them and histogram info
+			firstRun();
+			
+			// wait until all threads finish the first run
+			firstRun.countDown();
+			while (firstRun.getCount() > 0 && active()) {
+				try {
+					firstRun.await(10, TimeUnit.MILLISECONDS);
+				} catch (InterruptedException e) {}
+			}
+			
+            // if hist. equalization enabled, perform second run for coloring
+            if (histEqualization && active()) {
+                secondRun();
+            }
+			
+            // update rendering time
+            renderingTime = System.currentTimeMillis() - renderingStart;
+        }
+		
+		private void firstRun() {
+			// consume pixels until exhausted or thread is interrupted
+			int idx;
+			while ((idx = firstIndex.getAndIncrement()) < total && active()) {
+				// 1D to 2D coordinates
+				final int xy = indexes[idx];
+				final int x = xy % width;
+				final int y = xy / width;
+				
+				// map coordinates into Mandelbrot space
+				final double mx = x * scale + location.getX();
+				final double my = - y * scale + location.getY();
+				
+				final int iter = Algorithm.escapeTime(mx, my, maxRadius, maxIter);
+				final double fraction = iter % 1;
+				
+	            image.setRGB(x, y, iter);
+	            
+	            processed.incrementAndGet();
+			}
 			
 		}
 		
+		private void secondRun() {
+			
+		}
+		
+		private boolean active() {
+			return !currentThread().isInterrupted();
+		}
 	}
 }
