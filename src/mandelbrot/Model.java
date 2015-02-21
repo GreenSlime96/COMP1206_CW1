@@ -70,12 +70,12 @@ public class Model extends Observable implements ActionListener {
 	 */
 	public Model() {
 		super();
-		// setActive(false);
-		// setSize(new Dimension(1, 1));
-		// setFps(25);
-		// setMaxIterations(200);
-		// setMaxRadius(10);
-		// setActive(true);
+		setActive(false);
+		setSize(new Dimension(1, 1));
+		setFps(25);
+		setMaxIterations(200);
+		setMaxRadius(10);
+		setActive(true);
 	}
 
 	// ==== Accessors ====
@@ -315,8 +315,8 @@ public class Model extends Observable implements ActionListener {
 	public synchronized void fit() {
 		stopDrawing();
 
-		location = new Point2D.Double(-2.6, -1);
-		scale = 1 / 200;
+		location = new Point2D.Double(-2.5, -1);
+		scale = 1 / 200.;
 
 		show(new Rectangle(0, 0, (int) (3.5 / scale), (int) (2. / scale)));
 	}
@@ -397,7 +397,29 @@ public class Model extends Observable implements ActionListener {
 
 	private void startDrawing() {
 		if (active) {
-
+			timer.start();
+			renderingStart = System.currentTimeMillis();
+			
+			// spawn new threads to perform the calculations
+			for (int i = 0; i < threadCount; i ++) {
+				Thread thread = new Calculation();
+				thread.start();
+				threads.add(thread);
+			}
 		}
+	}
+	
+	// ==== Calculation Task ====
+	
+	private class Calculation extends Thread {
+		final int width = image.getWidth();
+//		final int total = indexes.length;
+
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			
+		}
+		
 	}
 }
