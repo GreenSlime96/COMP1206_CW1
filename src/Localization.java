@@ -1,5 +1,3 @@
-package mandelbrot;
-
 import java.io.UnsupportedEncodingException;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
@@ -10,7 +8,7 @@ import java.util.ResourceBundle;
 public class Localization {
 
     private static ResourceBundle bundle =
-        ResourceBundle.getBundle("mandelbrot.Localization");
+        ResourceBundle.getBundle("Localization");
 
     /**
      * Tries to find a localization within the Localization resource bundle.

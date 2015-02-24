@@ -1,8 +1,5 @@
-package mandelbrot;
-
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
@@ -24,6 +21,8 @@ public class View extends JComponent implements Observer, ActionListener {
 
 	// ==== Constants ====
 
+	private static final long serialVersionUID = -8690150230262167823L;
+	
 	private final double ZOOM_FACTOR = .6;
 	private final double PAN_THRESHOLD = 8.;
 
@@ -34,6 +33,8 @@ public class View extends JComponent implements Observer, ActionListener {
 	private final Timer timer = new Timer(250, this);
 	
 	private String complex = "";
+	
+	private BufferedImage julia = new BufferedImage(200, 150, BufferedImage.TYPE_INT_RGB);
 
 	// ==== Constructor ====
 
@@ -61,7 +62,7 @@ public class View extends JComponent implements Observer, ActionListener {
 
 			@Override
 			public void componentShown(ComponentEvent e) {
-				final Timer timer = new Timer(100, new ActionListener() {
+				final Timer timer = new Timer(1000, new ActionListener() {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						model.setSize(getSize());
@@ -89,15 +90,40 @@ public class View extends JComponent implements Observer, ActionListener {
 			public void mouseReleased(MouseEvent e) {
 				if (panning) {
 					panning = false;
-					model.setActive(true);
+					model.setReady(true);
 				}
 			}
 			
 			// labeling
-			public void mouseMoved(MouseEvent e){
+			public void mouseMoved(MouseEvent e) {
 				if (!panning) {
 					Point2D p = model.getPoint(e.getX(), e.getY());	
 					complex = p.getX() + " + " + p.getY() + "i";
+					
+					for(int y = 0; y < 150; y ++) {
+						for(int x = 0; x < 200; x ++) {
+							double x0 = -2.0 + x * (4.0 / 200);
+							double y0 = 1.6 - y * (3.2 / 150);
+							
+							int iteration = 0;
+									
+							while (x0 * x0 + y0 * y0 < 4 && iteration < 100) {
+								double xt = x0 * x0 - y0 * y0 + p.getX();
+								double yt = 2 * x0 * y0 + p.getY();
+								
+								x0 = xt;
+								y0 = yt;
+								
+								iteration ++;
+							}
+														
+							float hsvFloat = (float) ((double) iteration / 100);						
+							int HSVtoRGB = (iteration >= 100) ? Color.BLACK.getRGB() : Color.HSBtoRGB(hsvFloat, 1, 1 - hsvFloat);
+							
+							julia.setRGB(x, y, HSVtoRGB);
+						}
+					}
+					
 					repaint();
 				}
 			}
@@ -112,7 +138,7 @@ public class View extends JComponent implements Observer, ActionListener {
 					if (d >= PAN_THRESHOLD) {
 						panning = true;
 						pressed = e.getPoint();
-						model.setActive(false);
+						model.setReady(false);
 					}
 
 					return;
@@ -129,6 +155,19 @@ public class View extends JComponent implements Observer, ActionListener {
 					model.scale(e.getX(), e.getY(),
 							e.getButton() == MouseEvent.BUTTON1 ? ZOOM_FACTOR
 									: 1 / ZOOM_FACTOR);
+				} else {
+					final Point2D point = model.getPoint(e.getPoint());
+					double x0 = point.getX(), y0 = point.getY();
+					
+					double p = Math.sqrt(Math.pow(x0 - (1.0 / 4.0), 2) + y0 * y0);
+
+					if (x0 < (p - 2 * p * p + (1.0 / 4.0))) {
+						System.out.println("firstCond");
+					}
+						
+					if (Math.pow(x0 + 1, 2) + (y0 * y0) < (1.0 / 16.0))
+						System.out.println("secondCond");
+//					System.out.println(Algorithm.escapeTimer(point.getX(), point.getY(), model.getMaxRadius(), model.getMaxIterations()));
 				}
 			}
 
@@ -152,15 +191,18 @@ public class View extends JComponent implements Observer, ActionListener {
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		
-		g.setColor(Color.white);
-		
-		FontMetrics f = g.getFontMetrics();
+		// draw the image
 		BufferedImage image = model.getImage();
 		int w = Math.min(image.getWidth(), getWidth()),
 				h = Math.min(image.getHeight(), getHeight());
-		g.drawImage(image, 0, 0, w, h, 0, 0, w, h, null);
-		g.drawString(complex, (w - f.stringWidth(complex)) / 2,
-				h - f.getHeight());
+		g.drawImage(image, 0, 0, null);
+		g.drawImage(julia, 5, 5, null);
+		
+		// draw the text
+		g.setColor(Color.WHITE);
+		g.drawRect(5, 5, julia.getWidth(), julia.getHeight());
+		g.drawString(complex, (w - g.getFontMetrics().stringWidth(complex)) / 2,
+				h - g.getFontMetrics().getHeight());
 	}
 
 	// ==== Observer Implementation ====

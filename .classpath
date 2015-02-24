@@ -2,5 +2,13 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+	<classpathentry kind="src" path="/Programming_2"/>
+	<classpathentry kind="lib" path="aparapi.jar">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="/Users/khengboonpek/Documents/workspace/Mandelbrot"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="jocl.jar"/>
+	<classpathentry kind="lib" path="/Experimentals/JOCL-0.1.9.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
